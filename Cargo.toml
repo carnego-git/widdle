@@ -1,0 +1,14 @@
+[package]
+name = "widdle"
+description = "An async, synchronized, database-backed Rust job scheduler forked from widdle"
+version = "1.0.0"
+edition = "2018"
+
+[dependencies]
+pretty_env_logger = "0.4"
+chrono = { version = "0.4" }
+futures = { version = "0.3", default-features = true, features = ["async-await"] }
+async-trait = "0.1.41"
+log = "0.4.11"
+cron = "*"
+tokio = { version = "1.4", features = ["full"] }
