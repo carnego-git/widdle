@@ -44,6 +44,21 @@ fn test_cron() {
 }
 
 
+#[test]
+fn test_seconds_cron() {
+
+    use cron::Schedule;
+    use chrono::Utc;
+    use std::str::FromStr;
+
+    let expression = "0 */30 * * * * *";
+    let schedule = Schedule::from_str(expression).unwrap();
+    println!("Upcoming fire times:");
+    for datetime in schedule.upcoming(Utc).take(10) {
+        println!("-> {}", datetime);
+    }
+}
+
 #[tokio::test]
 async fn test_basic() {
 
