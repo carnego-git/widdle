@@ -35,6 +35,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use cron::Schedule;
 use std::str::FromStr;
+use humantime::format_duration;
 
 type BoxedJob = Box<dyn Job + Send + Sync>;
 
@@ -200,15 +201,26 @@ impl JobRunner {
     pub fn announce_jobs_stdout(&self) {
         for job in &self.jobs {
 
-            let cron_str = job.get_config().cron_str.to_string();
+            if job.get_config().is_cron_powered() {
+                let cron_str = job.get_config().cron_str.as_ref().unwrap().to_string();
 
-            println!("job '{}' with cron-schedule: {:?} next event: {:?} registered successfully",
-                job.get_config().name, cron_str, job.get_config().get_next_event());
+                println!("job '{}' with cron-schedule: {:?} next event: {:?} registered successfully",
+                    job.get_config().name, cron_str, job.get_config().get_next_event());
 
-            let schedule = Schedule::from_str(&cron_str).unwrap();
-            println!("Upcoming fire times:");
-            for datetime in schedule.upcoming(Utc).take(10) {
-                println!("-> {}", datetime);
+                let schedule = Schedule::from_str(&cron_str).unwrap();
+                println!("Upcoming fire times:");
+                for datetime in schedule.upcoming(Utc).take(10) {
+                    println!("-> {}", datetime);
+                }
+            }
+            else {
+  
+                let chrono_duration = job.get_config().interval.unwrap();
+                let std_duration: std::time::Duration = chrono_duration.to_std().unwrap();
+
+                let human_readable: humantime::FormattedDuration = format_duration(std_duration);
+
+                println!("job '{}' called every {} registered successfully", job.get_config().name, human_readable);
             }
         }
     }

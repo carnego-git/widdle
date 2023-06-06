@@ -14,8 +14,9 @@ pub struct JobConfig {
     /// An arbitrary identifier used for logging
     pub name: String,
     /// The Quartz cron expression to use, for defining job run times (e.g.: `"* 0 0 ? * * *"`)
-    pub(crate) schedule: Schedule,
-    pub(crate) cron_str: String,
+    pub(crate) schedule: Option<Schedule>,
+    pub(crate) cron_str: Option<String>,
+    pub(crate) interval: Option<chrono::Duration>,
     pub(crate) oneshot: bool,
     pub(crate) last_tick: Arc<Mutex<Cell<Option<DateTime<Utc>>>>>,
     pub(crate) running: Arc<AtomicBool>,
@@ -35,16 +36,34 @@ impl JobConfig {
     /// Create a new job with an arbitrary name and a unique sync key
     ///
     /// After creating a job, you need to set either `interval`, or `cron` for the job to be valid
-    pub fn new(name: &str, expression: &str) -> Self {
+    pub fn new_schedule(name: &str, cron_str: &str) -> Self {
         Self {
             name: name.to_owned(),
-            schedule:  Schedule::from_str(expression).expect("invalid cron expression"),
-            cron_str: expression.to_owned(),
+            schedule:  Some(Schedule::from_str(cron_str).expect("invalid cron expression")),
+            cron_str: Some(cron_str.to_owned()),
+            interval: None,
             oneshot: false,
             last_tick: Arc::new(Mutex::new(Cell::new(None))),
             running: Arc::new(AtomicBool::new(false)),
             have_run: Arc::new(AtomicBool::new(false))
         }
+    }
+
+    pub fn new_interval(name: &str, duration: &chrono::Duration) -> Self {
+        Self {
+            name: name.to_owned(),
+            schedule:  None,
+            cron_str: None,
+            interval: Some(duration.clone()),
+            oneshot: false,
+            last_tick: Arc::new(Mutex::new(Cell::new(None))),
+            running: Arc::new(AtomicBool::new(false)),
+            have_run: Arc::new(AtomicBool::new(false))
+        }
+    }
+
+    pub fn is_cron_powered(&self) -> bool {
+        self.schedule.is_some()
     }
 
     pub fn set_oneshot(&mut self) {
@@ -80,8 +99,11 @@ impl JobConfig {
     }
 
     pub fn get_next_event(&self) -> Option<DateTime<Utc>> {
+
+        assert!(self.schedule.is_some(), "No scheduler defined! Is a duration / interval being used ?");
+
         // let events = self.schedule.upcoming(Utc);
-        self.schedule.upcoming(Utc).next()
+        self.schedule.as_ref().unwrap().upcoming(Utc).next()
     }
 
     pub fn job_should_run(&self, check_interval: chrono::Duration) -> bool {
@@ -90,28 +112,41 @@ impl JobConfig {
 
         let is_running : bool = self.is_running();
 
-        if self.get_last_tick().is_none() || is_running {
+        let last_tick_option = self.get_last_tick();
+
+        if last_tick_option.is_none() || is_running {
             self.update_last_tick();
             return false;
         }
 
-        // Calculate the next time this event will take place.
-        let event: Option<DateTime<Utc>> = self.get_next_event();
+        let last_tick: DateTime<Utc> = last_tick_option.unwrap();
 
-        if event.is_some() {
+        if self.is_cron_powered() {
+            // Calculate the next time this event will take place.
+            let event: Option<DateTime<Utc>> = self.get_next_event();
 
-            let t = event.unwrap() - check_interval;
+            if event.is_some() {
 
-            // println!("event: {:?}  last_tick: {:?}", t, self.get_last_tick().unwrap());
+                let t = event.unwrap() - check_interval;
 
-            if now >= t {
-                self.update_last_tick();
-                // println!("should be running scheduled task for time {:?}", t);
-                return true;
-            } else {
-                
-                return false;
+                // println!("event: {:?}  last_tick: {:?}", t, self.get_last_tick().unwrap());
+
+                if now >= t {
+                    self.update_last_tick();
+                    // println!("should be running scheduled task for time {:?}", t);
+                    return true;
+                } else {
+                    return false;
+                }
             }
+        }
+        else {
+            // We have intervals not cron
+            let duration: chrono::Duration = self.interval.unwrap();
+            // Calculate the difference between now and the last tick
+            let time_elapsed = now.signed_duration_since(last_tick);
+
+            return time_elapsed >= duration;
         }
         
         // self.update_last_tick();
