@@ -26,6 +26,7 @@
 mod config;
 
 pub use async_trait::async_trait;
+use chrono::DateTime;
 pub use config::JobConfig;
 pub use config::RunnerConfig;
 use futures::future::join_all;
@@ -190,6 +191,26 @@ impl JobRunner {
         }
     }
 
+    pub fn get_next_events(cron_str: &str, count: usize) -> Vec<DateTime<Utc>> {
+        let schedule = match Schedule::from_str(cron_str) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+    
+        let mut events = Vec::with_capacity(count);
+    
+        let now = Utc::now();
+        let mut iter = schedule.after(&now);
+        while let Some(event) = iter.next() {
+            events.push(event);
+            if events.len() >= count {
+                break;
+            }
+        }
+    
+        events
+    }
+    
     // Logs an announcement for all registered jobs
     pub fn announce_jobs(&self) {
         for job in &self.jobs {
