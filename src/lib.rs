@@ -250,8 +250,8 @@ impl JobRunner {
     async fn check_and_run_jobs(&self, jobs: Arc<&Vec<BoxedJob>>) {
         let job_futures = jobs
             .iter()
-            .map(|job| {
-                let j = job.box_clone();
+            .map(|job: &Box<dyn Job + Send + Sync>| {
+                let j: Box<dyn Job + Send + Sync> = job.box_clone();
                 self.check_and_run_job(j)
             })
             .collect::<Vec<_>>();
@@ -262,25 +262,25 @@ impl JobRunner {
     //
     // Connects to the database, checks if the given job should be run again and if so, sets the
     // `last_run` of the job to `now()` and executes the job.
-    async fn check_and_run_job(&self, job: BoxedJob) -> Result<(), Error> {
-
+    async fn check_and_run_job(&self, job: BoxedJob) -> Result<tokio::task::JoinHandle<()>, Error> {
         if job.get_config().job_should_run(chrono::Duration::from_std(self.config.check_interval).expect("expected duration conversion")) {
-
             job.get_config().update_last_tick();
-
+    
             if job.get_config().oneshot && job.get_config().has_run() {
-                return Ok(());
+                return Ok(tokio::task::spawn(async move {}));
             }
-
-            tokio::spawn(async move {
+    
+            let handle = tokio::spawn(async move {
                 job.get_config().set_running(true);
                 job.run().await;
                 job.get_config().set_running(false);
                 job.get_config().set_have_run(true);
                 job.get_config().update_last_tick();
             });
+    
+            return Ok(handle);
         }
-
-        Ok(())
+    
+        Ok(tokio::task::spawn(async move {}))
     }
 }
