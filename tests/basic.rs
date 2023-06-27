@@ -103,11 +103,43 @@ async fn test_basic() {
 
     // tokio::time::sleep(Duration::from_secs(60)).await;
 
-    if let Err(e) = job_runner.start().await {
+    if let Err(e) = job_runner.start_threaded().await {
         eprintln!("error: {}", e);
     }
 }
 
+#[tokio::test]
+async fn test_basic_no_thread() {
+
+    let mut jobs = vec![];
+    let job_cfg = JobConfig::new_schedule("my_job", "*/2 * * * * * *");
+    let my_job = MyJob {
+        delay: 5,
+        ctx: MyJobContext {
+            name: "my context".to_string(),
+        },
+        config: job_cfg,
+    };
+
+    let job_cfg2 = JobConfig::new_schedule("my_job2", "*/10 * * * * * *");
+    let my_job2 = MyJob {
+        delay: 40,
+        ctx: MyJobContext {
+            name: "my context".to_string(),
+        },
+        config: job_cfg2,
+    };
+
+    jobs.push(my_job);
+    jobs.push(my_job2);
+
+    let config = RunnerConfig::default().check_interval(Duration::from_millis(100));
+    let job_runner = JobRunner::new_with_vec(config, jobs);
+
+    if let Err(e) = job_runner.start().await {
+        eprintln!("error: {}", e);
+    }
+}
 
 #[tokio::test]
 async fn test_duration() {
@@ -146,7 +178,7 @@ async fn test_duration() {
 
     // tokio::time::sleep(Duration::from_secs(60)).await;
 
-    if let Err(e) = job_runner.start().await {
+    if let Err(e) = job_runner.start_threaded().await {
         eprintln!("error: {}", e);
     }
 }
