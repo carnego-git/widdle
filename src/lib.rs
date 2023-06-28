@@ -191,19 +191,19 @@ impl JobRunner {
         }
     }
 
-    pub async fn start(self) -> Result<(), Error> {
+    // pub async fn start(self) -> Result<(), Error> {
 
-        if let Some(initial_delay) = self.config.initial_delay {
-            tokio::time::sleep(initial_delay).await;
-        }
+    //     if let Some(initial_delay) = self.config.initial_delay {
+    //         tokio::time::sleep(initial_delay).await;
+    //     }
 
-        let mut job_interval = tokio::time::interval(self.config.check_interval);
-        let jobs = Arc::new(&self.jobs);
-        loop {
-            job_interval.tick().await;
-            self.check_and_run_jobs(jobs.clone()).await;
-        }
-    }
+    //     let mut job_interval = tokio::time::interval(self.config.check_interval);
+    //     let jobs = Arc::new(&self.jobs);
+    //     loop {
+    //         job_interval.tick().await;
+    //         self.check_and_run_jobs(jobs.clone()).await;
+    //     }
+    // }
 
     pub fn get_next_events(cron_str: &str, count: usize) -> Vec<DateTime<Utc>> {
         let schedule = match Schedule::from_str(cron_str) {
@@ -299,35 +299,35 @@ impl JobRunner {
     }
 
     // Checks and runs, if necessary, all jobs concurrently
-    async fn check_and_run_jobs(&self, jobs: Arc<&Vec<BoxedJob>>) {
-        for job in jobs.iter() {
-            let j = job.box_clone();
-            if let Err(e) = self.check_and_run_job(j).await {
-                eprintln!("Error executing job: {}", e);
-            }
-        }
-    }
+    // async fn check_and_run_jobs(&self, jobs: Arc<&Vec<BoxedJob>>) {
+    //     for job in jobs.iter() {
+    //         let j = job.box_clone();
+    //         if let Err(e) = self.check_and_run_job(j).await {
+    //             eprintln!("Error executing job: {}", e);
+    //         }
+    //     }
+    // }
 
     // Checks and runs a single [Job](crate::Job)
     //
     // Connects to the database, checks if the given job should be run again and if so, sets the
     // `last_run` of the job to `now()` and executes the job.
-    async fn check_and_run_job(&self, job: BoxedJob) -> Result<(), Error> {
-        if job.get_config().job_should_run(chrono::Duration::from_std(self.config.check_interval).expect("expected duration conversion")) {
-            job.get_config().update_last_tick();
+    // async fn check_and_run_job(&self, job: BoxedJob) -> Result<(), Error> {
+    //     if job.get_config().job_should_run(chrono::Duration::from_std(self.config.check_interval).expect("expected duration conversion")) {
+    //         job.get_config().update_last_tick();
 
-            if job.get_config().oneshot && job.get_config().has_run() {
-                return Ok(());
-            }
+    //         if job.get_config().oneshot && job.get_config().has_run() {
+    //             return Ok(());
+    //         }
 
-            job.get_config().set_running(true);
-            job.run().await;
-            job.get_config().set_running(false);
-            job.get_config().set_have_run(true);
-            job.get_config().update_last_tick();
-        }
+    //         job.get_config().set_running(true);
+    //         job.run().await;
+    //         job.get_config().set_running(false);
+    //         job.get_config().set_have_run(true);
+    //         job.get_config().update_last_tick();
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
 }
